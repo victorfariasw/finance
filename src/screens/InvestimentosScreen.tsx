@@ -22,6 +22,7 @@ import { ItemFormModal } from '../components/ItemFormModal';
 import { ActualModal } from '../components/ActualModal';
 import { YieldModal } from '../components/YieldModal';
 import { WithdrawalModal } from '../components/WithdrawalModal';
+import { CopyToMonthsModal } from '../components/CopyToMonthsModal';
 
 type AddTarget = 'aporte' | 'rendimento' | 'retirada' | null;
 
@@ -32,7 +33,7 @@ export function InvestimentosScreen({
   month: MonthKey;
   onChangeMonth: (m: MonthKey) => void;
 }) {
-  const { state, setActual } = useFinance();
+  const { state, setActual, addItem } = useFinance();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const aportes = itemsForMonth(state, 'investment', month);
@@ -46,6 +47,7 @@ export function InvestimentosScreen({
   const [valueItem, setValueItem] = React.useState<RecurringItem | null>(null);
   const [editYield, setEditYield] = React.useState<YieldEntry | null>(null);
   const [editWithdraw, setEditWithdraw] = React.useState<WithdrawalEntry | null>(null);
+  const [copyItem, setCopyItem] = React.useState<RecurringItem | null>(null);
 
   return (
     <View style={styles.container}>
@@ -199,6 +201,7 @@ export function InvestimentosScreen({
         kind="investment"
         month={month}
         editing={editItem}
+        onCopy={(it) => setCopyItem(it)}
       />
       <ActualModal
         visible={valueItem !== null}
@@ -219,6 +222,19 @@ export function InvestimentosScreen({
         onClose={() => setEditWithdraw(null)}
         month={month}
         editing={editWithdraw}
+      />
+      <CopyToMonthsModal
+        visible={copyItem !== null}
+        onClose={() => setCopyItem(null)}
+        fromMonth={copyItem?.month ?? month}
+        title={copyItem ? `Copiar "${copyItem.name}"` : 'Copiar'}
+        accent={colors.invest}
+        onCopy={(months) => {
+          if (!copyItem) return;
+          months.forEach((m) =>
+            addItem({ kind: copyItem.kind, name: copyItem.name, planned: copyItem.planned, month: m }),
+          );
+        }}
       />
     </View>
   );

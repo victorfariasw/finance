@@ -47,9 +47,7 @@ export function ItemRow({
           </Text>
           {actual?.paid ? <View style={[styles.dot, { backgroundColor: accent }]} /> : null}
         </View>
-        <Text style={styles.meta}>
-          {item.fixed ? 'Fixo' : 'Avulso'} · Previsto {formatBRL(item.planned)}
-        </Text>
+        <Text style={styles.meta}>Previsto {formatBRL(item.planned)}</Text>
       </View>
 
       <View style={styles.right}>

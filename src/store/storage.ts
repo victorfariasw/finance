@@ -10,13 +10,30 @@ export async function loadState(): Promise<AppState> {
     const parsed = JSON.parse(raw);
     // Merge defensivo para tolerar versões antigas / campos ausentes.
     return {
-      items: Array.isArray(parsed.items) ? parsed.items : [],
-      actuals: parsed.actuals && typeof parsed.actuals === 'object' ? parsed.actuals : {},
-      // Compras antigas: `planned` default confirmado, `recurring` default parcelada.
-      cards: Array.isArray(parsed.cards)
-        ? parsed.cards.map((c: any) => ({ ...c, planned: c.planned ?? false, recurring: c.recurring ?? false }))
+      // Itens legados (com fixed/startMonth) viram lançamentos de mês único (month = startMonth).
+      items: Array.isArray(parsed.items)
+        ? parsed.items.map((it: any) => ({
+            id: it.id,
+            kind: it.kind,
+            name: it.name,
+            planned: it.planned,
+            month: it.month ?? it.startMonth,
+            createdAt: it.createdAt,
+          }))
         : [],
-      cardActuals: parsed.cardActuals && typeof parsed.cardActuals === 'object' ? parsed.cardActuals : {},
+      actuals: parsed.actuals && typeof parsed.actuals === 'object' ? parsed.actuals : {},
+      // Compras antigas: `planned` default confirmado. (Campo `recurring` legado é ignorado.)
+      cards: Array.isArray(parsed.cards)
+        ? parsed.cards.map((c: any) => ({
+            id: c.id,
+            description: c.description,
+            total: c.total,
+            installments: c.installments ?? 1,
+            firstMonth: c.firstMonth,
+            planned: c.planned ?? false,
+            createdAt: c.createdAt,
+          }))
+        : [],
       yields: Array.isArray(parsed.yields) ? parsed.yields : [],
       withdrawals: Array.isArray(parsed.withdrawals) ? parsed.withdrawals : [],
     };

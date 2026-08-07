@@ -15,11 +15,13 @@ export function CardFormModal({
   onClose,
   month,
   editing,
+  onCopy,
 }: {
   visible: boolean;
   onClose: () => void;
   month: MonthKey;
   editing?: CardPurchase | null;
+  onCopy?: (card: CardPurchase) => void;
 }) {
   const { addCard, updateCard, deleteCard } = useFinance();
   const { colors } = useTheme();
@@ -29,7 +31,6 @@ export function CardFormModal({
   const [total, setTotal] = React.useState(0);
   const [installments, setInstallments] = React.useState(1);
   const [firstMonth, setFirstMonth] = React.useState<MonthKey>(month);
-  const [recurring, setRecurring] = React.useState(false);
   const [planned, setPlanned] = React.useState(false);
 
   React.useEffect(() => {
@@ -39,44 +40,35 @@ export function CardFormModal({
       setTotal(editing.total);
       setInstallments(editing.installments);
       setFirstMonth(editing.firstMonth);
-      setRecurring(editing.recurring);
       setPlanned(editing.planned);
     } else {
       setDescription('');
       setTotal(0);
       setInstallments(1);
       setFirstMonth(month);
-      setRecurring(false);
       setPlanned(false);
     }
   }, [visible, editing, month]);
 
-  // Recorrente entra como Previsto (simulação) por padrão.
-  const chooseRecurring = () => {
-    setRecurring(true);
-    setPlanned(true);
-  };
-
-  const canSave = description.trim().length > 0 && total > 0;
+  const canSave = description.trim().length > 0 && total > 0 && installments >= 1;
   const perInstallment = installments >= 1 ? installmentAmount(total, installments, 0) : 0;
   const lastMonth = addMonths(firstMonth, installments - 1);
 
   const save = () => {
     if (!canSave) return;
-    const data = {
-      description: description.trim(),
-      total,
-      installments: recurring ? 1 : installments,
-      firstMonth,
-      recurring,
-      planned,
-    };
+    const data = { description: description.trim(), total, installments, firstMonth, planned };
     if (editing) {
       updateCard({ ...editing, ...data });
     } else {
       addCard(data);
     }
     onClose();
+  };
+
+  const copy = () => {
+    if (!editing || !onCopy) return;
+    onClose();
+    onCopy(editing);
   };
 
   const remove = () => {
@@ -96,39 +88,22 @@ export function CardFormModal({
 
   return (
     <ModalSheet visible={visible} onClose={onClose} title={editing ? 'Editar compra' : 'Nova compra no cartão'}>
-      <TextField label="Descrição" value={description} onChange={setDescription} placeholder="Ex: Internet" />
+      <TextField label="Descrição" value={description} onChange={setDescription} placeholder="Ex: PetLove" />
+
+      <MoneyInput label="Valor total" cents={total} onChange={setTotal} accent={colors.card} />
+
+      <NumberField label="Parcelas" value={installments} onChange={setInstallments} suffix="x" />
 
       <View style={styles.field}>
-        <Label>Tipo</Label>
+        <Label>Situação</Label>
         <View style={styles.chips}>
-          <Chip label="Parcelada" active={!recurring} onPress={() => setRecurring(false)} color={colors.card} />
-          <Chip label="Recorrente (mensal)" active={recurring} onPress={chooseRecurring} color={colors.card} />
+          <Chip label="Já comprei" active={!planned} onPress={() => setPlanned(false)} color={colors.card} />
+          <Chip label="Previsto (simulação)" active={planned} onPress={() => setPlanned(true)} color={colors.card} />
         </View>
       </View>
 
-      <MoneyInput
-        label={recurring ? 'Valor mensal' : 'Valor total'}
-        cents={total}
-        onChange={setTotal}
-        accent={colors.card}
-      />
-
-      {!recurring ? (
-        <NumberField label="Parcelas" value={installments} onChange={setInstallments} suffix="x" />
-      ) : null}
-
-      {!recurring ? (
-        <View style={styles.field}>
-          <Label>Situação</Label>
-          <View style={styles.chips}>
-            <Chip label="Já comprei" active={!planned} onPress={() => setPlanned(false)} color={colors.card} />
-            <Chip label="Previsto (simulação)" active={planned} onPress={() => setPlanned(true)} color={colors.card} />
-          </View>
-        </View>
-      ) : null}
-
       <View style={styles.field}>
-        <Label>{recurring ? 'A partir de' : '1ª parcela em'}</Label>
+        <Label>1ª parcela em</Label>
         <View style={styles.monthPicker}>
           <Pressable style={styles.monthArrow} onPress={() => setFirstMonth(addMonths(firstMonth, -1))}>
             <Text style={styles.monthArrowLabel}>‹</Text>
@@ -140,31 +115,28 @@ export function CardFormModal({
         </View>
       </View>
 
-      {total > 0 ? (
+      {total > 0 && installments >= 1 ? (
         <View style={styles.preview}>
-          {recurring ? (
-            <>
-              <Text style={styles.previewMain}>{formatBRL(total)} / mês (previsto)</Text>
-              <Text style={styles.previewSub}>
-                A partir de {labelMedium(firstMonth)} · ajuste o valor real em cada mês
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.previewMain}>
-                {installments}x de {formatBRL(perInstallment)}
-              </Text>
-              <Text style={styles.previewSub}>
-                {installments === 1
-                  ? `Cai em ${labelMedium(firstMonth)}`
-                  : `De ${labelMedium(firstMonth)} até ${labelMedium(lastMonth)}`}
-              </Text>
-            </>
-          )}
+          <Text style={styles.previewMain}>
+            {installments}x de {formatBRL(perInstallment)}
+          </Text>
+          <Text style={styles.previewSub}>
+            {installments === 1
+              ? `Cai em ${labelMedium(firstMonth)}`
+              : `De ${labelMedium(firstMonth)} até ${labelMedium(lastMonth)}`}
+          </Text>
         </View>
       ) : null}
 
       <Button label="Salvar" onPress={save} disabled={!canSave} />
+      {editing && onCopy ? (
+        <Button
+          label="Copiar para outros meses"
+          onPress={copy}
+          variant="ghost"
+          style={{ marginTop: spacing.sm }}
+        />
+      ) : null}
       {editing ? (
         <Button label="Excluir" onPress={remove} variant="danger" style={{ marginTop: spacing.sm }} />
       ) : null}

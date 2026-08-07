@@ -10,7 +10,6 @@ import {
   AppState,
   Actual,
   CardPurchase,
-  CardActual,
   MonthKey,
   RecurringItem,
   YieldEntry,
@@ -29,7 +28,6 @@ type Action =
   | { type: 'ADD_CARD'; card: CardPurchase }
   | { type: 'UPDATE_CARD'; card: CardPurchase }
   | { type: 'DELETE_CARD'; id: string }
-  | { type: 'SET_CARD_ACTUAL'; cardId: string; month: MonthKey; actual: CardActual | null }
   | { type: 'ADD_YIELD'; entry: YieldEntry }
   | { type: 'UPDATE_YIELD'; entry: YieldEntry }
   | { type: 'DELETE_YIELD'; id: string }
@@ -84,28 +82,8 @@ function reducer(state: AppState, action: Action): AppState {
         cards: state.cards.map((c) => (c.id === action.card.id ? action.card : c)),
       };
 
-    case 'DELETE_CARD': {
-      const cardActuals = { ...state.cardActuals };
-      delete cardActuals[action.id];
-      return {
-        ...state,
-        cards: state.cards.filter((c) => c.id !== action.id),
-        cardActuals,
-      };
-    }
-
-    case 'SET_CARD_ACTUAL': {
-      const byMonth = { ...(state.cardActuals[action.cardId] ?? {}) };
-      if (action.actual === null) {
-        delete byMonth[action.month];
-      } else {
-        byMonth[action.month] = action.actual;
-      }
-      return {
-        ...state,
-        cardActuals: { ...state.cardActuals, [action.cardId]: byMonth },
-      };
-    }
+    case 'DELETE_CARD':
+      return { ...state, cards: state.cards.filter((c) => c.id !== action.id) };
 
     case 'ADD_YIELD':
       return { ...state, yields: [...state.yields, action.entry] };
@@ -152,7 +130,6 @@ interface FinanceContextValue {
   addCard: (data: Omit<CardPurchase, 'id' | 'createdAt'>) => void;
   updateCard: (card: CardPurchase) => void;
   deleteCard: (id: string) => void;
-  setCardActual: (cardId: string, month: MonthKey, actual: CardActual | null) => void;
   // rendimentos
   addYield: (data: Omit<YieldEntry, 'id' | 'createdAt'>) => void;
   updateYield: (entry: YieldEntry) => void;
@@ -208,8 +185,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'ADD_CARD', card: { ...data, id: makeId(), createdAt: Date.now() } }),
       updateCard: (card) => dispatch({ type: 'UPDATE_CARD', card }),
       deleteCard: (id) => dispatch({ type: 'DELETE_CARD', id }),
-      setCardActual: (cardId, month, actual) =>
-        dispatch({ type: 'SET_CARD_ACTUAL', cardId, month, actual }),
       addYield: (data) =>
         dispatch({ type: 'ADD_YIELD', entry: { ...data, id: makeId(), createdAt: Date.now() } }),
       updateYield: (entry) => dispatch({ type: 'UPDATE_YIELD', entry }),

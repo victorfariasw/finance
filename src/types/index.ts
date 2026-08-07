@@ -7,18 +7,16 @@ export type MonthKey = string; // formato "AAAA-MM", ex: "2026-08"
 export type ItemKind = 'income' | 'expense' | 'investment';
 
 /**
- * Item recorrente: uma definição de entrada ou saída.
- * - fixed=true  -> aparece todo mês a partir de startMonth (até endMonth, se houver)
- * - fixed=false -> aparece apenas no mês startMonth (lançamento avulso)
+ * Lançamento de entrada, saída ou aporte — pertence a um ÚNICO mês.
+ * Sem recorrência: para repetir em outros meses, usa-se "copiar para outros meses"
+ * (cria cópias independentes).
  */
 export interface RecurringItem {
   id: string;
   kind: ItemKind;
   name: string;
-  planned: number;          // valor previsto (centavos)
-  fixed: boolean;
-  startMonth: MonthKey;
-  endMonth: MonthKey | null; // opcional: quando o item deixa de existir
+  planned: number;   // valor previsto (centavos)
+  month: MonthKey;   // mês ao qual o lançamento pertence
   createdAt: number;
 }
 
@@ -39,13 +37,10 @@ export interface Actual {
 export interface CardPurchase {
   id: string;
   description: string;
-  // recurring=false: `total` é o valor TOTAL, dividido em `installments` parcelas.
-  // recurring=true:  `total` é o valor MENSAL fixo, repetido todo mês (sem parcelar).
-  total: number;          // centavos
-  installments: number;   // usado só quando !recurring (>= 1)
-  firstMonth: MonthKey;   // mês da 1ª parcela / mês inicial
-  recurring: boolean;     // cobrança mensal fixa (ex: internet), sem parcelamento
-  planned: boolean;
+  total: number;          // valor total da compra (centavos)
+  installments: number;   // quantidade de parcelas (>= 1)
+  firstMonth: MonthKey;   // mês da 1ª parcela
+  planned: boolean;       // true = previsto (simulação); false = confirmado (real)
   createdAt: number;
 }
 
@@ -73,19 +68,11 @@ export interface WithdrawalEntry {
   createdAt: number;
 }
 
-/** Valor realizado de uma cobrança RECORRENTE do cartão, por mês (independente). */
-export interface CardActual {
-  amount: number; // centavos
-}
-
 export interface AppState {
   items: RecurringItem[]; // entradas, saídas comuns e aportes (kind='investment')
   // actuals[itemId][monthKey] = valor realizado
   actuals: Record<string, Record<MonthKey, Actual>>;
   cards: CardPurchase[];
-  // cardActuals[cardId][monthKey] = valor lançado de uma cobrança recorrente naquele mês.
-  // Presença = mês confirmado; ausência = ainda previsto. (Só usado por cartões recorrentes.)
-  cardActuals: Record<string, Record<MonthKey, CardActual>>;
   yields: YieldEntry[];
   withdrawals: WithdrawalEntry[];
 }
@@ -94,7 +81,6 @@ export const emptyState: AppState = {
   items: [],
   actuals: {},
   cards: [],
-  cardActuals: {},
   yields: [],
   withdrawals: [],
 };

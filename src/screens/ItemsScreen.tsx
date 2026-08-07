@@ -12,6 +12,7 @@ import { Card, Fab, EmptyState, Divider } from '../components/ui';
 import { ItemRow } from '../components/ItemRow';
 import { ItemFormModal } from '../components/ItemFormModal';
 import { ActualModal } from '../components/ActualModal';
+import { CopyToMonthsModal } from '../components/CopyToMonthsModal';
 
 export function ItemsScreen({
   kind,
@@ -22,7 +23,7 @@ export function ItemsScreen({
   month: MonthKey;
   onChangeMonth: (m: MonthKey) => void;
 }) {
-  const { state, setActual } = useFinance();
+  const { state, setActual, addItem } = useFinance();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const items = itemsForMonth(state, kind, month);
@@ -37,6 +38,7 @@ export function ItemsScreen({
   const [showAdd, setShowAdd] = React.useState(false);
   const [editing, setEditing] = React.useState<RecurringItem | null>(null);
   const [valueItem, setValueItem] = React.useState<RecurringItem | null>(null);
+  const [copyItem, setCopyItem] = React.useState<RecurringItem | null>(null);
 
   return (
     <View style={styles.container}>
@@ -70,7 +72,7 @@ export function ItemsScreen({
             <EmptyState
               icon={isIncome ? '💰' : '🧾'}
               title={isIncome ? 'Nenhuma entrada neste mês' : 'Nenhuma saída neste mês'}
-              subtitle={`Toque em + para adicionar. Marque como fixo para repetir todos os meses.`}
+              subtitle="Toque em + para adicionar. Depois dá pra copiar pra outros meses ao editar."
             />
           ) : (
             items.map((item, idx) => (
@@ -100,12 +102,26 @@ export function ItemsScreen({
         kind={kind}
         month={month}
         editing={editing}
+        onCopy={(it) => setCopyItem(it)}
       />
       <ActualModal
         visible={valueItem !== null}
         onClose={() => setValueItem(null)}
         item={valueItem}
         month={month}
+      />
+      <CopyToMonthsModal
+        visible={copyItem !== null}
+        onClose={() => setCopyItem(null)}
+        fromMonth={copyItem?.month ?? month}
+        title={copyItem ? `Copiar "${copyItem.name}"` : 'Copiar'}
+        accent={accent}
+        onCopy={(months) => {
+          if (!copyItem) return;
+          months.forEach((m) =>
+            addItem({ kind: copyItem.kind, name: copyItem.name, planned: copyItem.planned, month: m }),
+          );
+        }}
       />
     </View>
   );
