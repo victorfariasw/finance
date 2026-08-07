@@ -38,15 +38,24 @@ export function getActual(state: AppState, itemId: string, month: MonthKey): Act
   return state.actuals[itemId]?.[month];
 }
 
-/** Valor da parcela desta compra que cai no mês (0 se não cair). */
-export function cardInstallmentForMonth(card: CardPurchase, month: MonthKey): number {
+/** A compra incide neste mês? (recorrente: todo mês a partir do início; parcelada: dentro das parcelas) */
+export function cardActiveInMonth(card: CardPurchase, month: MonthKey): boolean {
   const idx = monthsBetween(card.firstMonth, month);
-  if (idx < 0 || idx >= card.installments) return 0;
+  if (card.recurring) return idx >= 0;
+  return idx >= 0 && idx < card.installments;
+}
+
+/** Valor desta compra que cai no mês (0 se não incidir). */
+export function cardInstallmentForMonth(card: CardPurchase, month: MonthKey): number {
+  if (!cardActiveInMonth(card, month)) return 0;
+  if (card.recurring) return card.total; // valor mensal fixo
+  const idx = monthsBetween(card.firstMonth, month);
   return installmentAmount(card.total, card.installments, idx);
 }
 
-/** Índice (1-based) da parcela deste mês, ou null. */
+/** Índice (1-based) da parcela deste mês, ou null (recorrentes não têm parcela). */
 export function cardInstallmentIndex(card: CardPurchase, month: MonthKey): number | null {
+  if (card.recurring) return null;
   const idx = monthsBetween(card.firstMonth, month);
   if (idx < 0 || idx >= card.installments) return null;
   return idx + 1;
@@ -54,7 +63,7 @@ export function cardInstallmentIndex(card: CardPurchase, month: MonthKey): numbe
 
 export function cardsForMonth(state: AppState, month: MonthKey): CardPurchase[] {
   return state.cards
-    .filter((c) => cardInstallmentIndex(c, month) !== null)
+    .filter((c) => cardActiveInMonth(c, month))
     .sort((a, b) => a.description.localeCompare(b.description, 'pt-BR'));
 }
 

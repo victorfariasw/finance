@@ -29,6 +29,7 @@ export function CardFormModal({
   const [total, setTotal] = React.useState(0);
   const [installments, setInstallments] = React.useState(1);
   const [firstMonth, setFirstMonth] = React.useState<MonthKey>(month);
+  const [recurring, setRecurring] = React.useState(false);
   const [planned, setPlanned] = React.useState(false);
 
   React.useEffect(() => {
@@ -38,33 +39,49 @@ export function CardFormModal({
       setTotal(editing.total);
       setInstallments(editing.installments);
       setFirstMonth(editing.firstMonth);
+      setRecurring(editing.recurring);
       setPlanned(editing.planned);
     } else {
       setDescription('');
       setTotal(0);
       setInstallments(1);
       setFirstMonth(month);
+      setRecurring(false);
       setPlanned(false);
     }
   }, [visible, editing, month]);
 
-  const canSave = description.trim().length > 0 && total > 0 && installments >= 1;
+  // Recorrente entra como Previsto (simulação) por padrão.
+  const chooseRecurring = () => {
+    setRecurring(true);
+    setPlanned(true);
+  };
+
+  const canSave = description.trim().length > 0 && total > 0;
   const perInstallment = installments >= 1 ? installmentAmount(total, installments, 0) : 0;
   const lastMonth = addMonths(firstMonth, installments - 1);
 
   const save = () => {
     if (!canSave) return;
+    const data = {
+      description: description.trim(),
+      total,
+      installments: recurring ? 1 : installments,
+      firstMonth,
+      recurring,
+      planned,
+    };
     if (editing) {
-      updateCard({ ...editing, description: description.trim(), total, installments, firstMonth, planned });
+      updateCard({ ...editing, ...data });
     } else {
-      addCard({ description: description.trim(), total, installments, firstMonth, planned });
+      addCard(data);
     }
     onClose();
   };
 
   const remove = () => {
     if (!editing) return;
-    Alert.alert('Excluir', `Excluir a compra "${editing.description}"?`, [
+    Alert.alert('Excluir', `Excluir "${editing.description}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Excluir',
@@ -78,16 +95,27 @@ export function CardFormModal({
   };
 
   return (
-    <ModalSheet
-      visible={visible}
-      onClose={onClose}
-      title={editing ? 'Editar compra' : 'Nova compra no cartão'}
-    >
-      <TextField label="Descrição" value={description} onChange={setDescription} placeholder="Ex: Notebook" />
+    <ModalSheet visible={visible} onClose={onClose} title={editing ? 'Editar compra' : 'Nova compra no cartão'}>
+      <TextField label="Descrição" value={description} onChange={setDescription} placeholder="Ex: Internet" />
 
-      <MoneyInput label="Valor total" cents={total} onChange={setTotal} accent={colors.card} />
+      <View style={styles.field}>
+        <Label>Tipo</Label>
+        <View style={styles.chips}>
+          <Chip label="Parcelada" active={!recurring} onPress={() => setRecurring(false)} color={colors.card} />
+          <Chip label="Recorrente (mensal)" active={recurring} onPress={chooseRecurring} color={colors.card} />
+        </View>
+      </View>
 
-      <NumberField label="Parcelas" value={installments} onChange={setInstallments} suffix="x" />
+      <MoneyInput
+        label={recurring ? 'Valor mensal' : 'Valor total'}
+        cents={total}
+        onChange={setTotal}
+        accent={colors.card}
+      />
+
+      {!recurring ? (
+        <NumberField label="Parcelas" value={installments} onChange={setInstallments} suffix="x" />
+      ) : null}
 
       <View style={styles.field}>
         <Label>Situação</Label>
@@ -98,7 +126,7 @@ export function CardFormModal({
       </View>
 
       <View style={styles.field}>
-        <Label>1ª parcela em</Label>
+        <Label>{recurring ? 'A partir de' : '1ª parcela em'}</Label>
         <View style={styles.monthPicker}>
           <Pressable style={styles.monthArrow} onPress={() => setFirstMonth(addMonths(firstMonth, -1))}>
             <Text style={styles.monthArrowLabel}>‹</Text>
@@ -110,16 +138,25 @@ export function CardFormModal({
         </View>
       </View>
 
-      {total > 0 && installments >= 1 ? (
+      {total > 0 ? (
         <View style={styles.preview}>
-          <Text style={styles.previewMain}>
-            {installments}x de {formatBRL(perInstallment)}
-          </Text>
-          <Text style={styles.previewSub}>
-            {installments === 1
-              ? `Cai em ${labelMedium(firstMonth)}`
-              : `De ${labelMedium(firstMonth)} até ${labelMedium(lastMonth)}`}
-          </Text>
+          {recurring ? (
+            <>
+              <Text style={styles.previewMain}>{formatBRL(total)} / mês</Text>
+              <Text style={styles.previewSub}>Todo mês a partir de {labelMedium(firstMonth)}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.previewMain}>
+                {installments}x de {formatBRL(perInstallment)}
+              </Text>
+              <Text style={styles.previewSub}>
+                {installments === 1
+                  ? `Cai em ${labelMedium(firstMonth)}`
+                  : `De ${labelMedium(firstMonth)} até ${labelMedium(lastMonth)}`}
+              </Text>
+            </>
+          )}
         </View>
       ) : null}
 

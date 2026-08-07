@@ -61,10 +61,10 @@ export function CartaoScreen({
 
         {/* Parcelas do mês */}
         <View style={styles.block}>
-          <SectionTitle>Parcelas de {labelMedium(month)}</SectionTitle>
+          <SectionTitle>Lançamentos de {labelMedium(month)}</SectionTitle>
           <Card style={{ paddingVertical: spacing.xs }}>
             {monthCards.length === 0 ? (
-              <EmptyState icon="💳" title="Nenhuma parcela neste mês" />
+              <EmptyState icon="💳" title="Nada no cartão neste mês" />
             ) : (
               monthCards.map((c, idx) => {
                 const parc = cardInstallmentIndex(c, month);
@@ -90,7 +90,7 @@ export function CartaoScreen({
                             {c.planned ? <PlannedTag /> : null}
                           </View>
                           <Text style={styles.rowMeta}>
-                            Parcela {parc}/{c.installments} · Total {formatBRL(c.total)}
+                            {c.recurring ? `Mensal · desde ${labelMedium(c.firstMonth)}` : `Parcela ${parc}/${c.installments} · Total ${formatBRL(c.total)}`}
                           </Text>
                         </View>
                         <Text style={[styles.rowValue, { color: colors.card }]}>{formatBRL(val)}</Text>

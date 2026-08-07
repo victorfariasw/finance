@@ -39,9 +39,12 @@ export interface Actual {
 export interface CardPurchase {
   id: string;
   description: string;
-  total: number;          // valor total da compra (centavos)
-  installments: number;   // quantidade de parcelas (>= 1)
-  firstMonth: MonthKey;   // mês da 1ª parcela
+  // recurring=false: `total` é o valor TOTAL, dividido em `installments` parcelas.
+  // recurring=true:  `total` é o valor MENSAL fixo, repetido todo mês (sem parcelar).
+  total: number;          // centavos
+  installments: number;   // usado só quando !recurring (>= 1)
+  firstMonth: MonthKey;   // mês da 1ª parcela / mês inicial
+  recurring: boolean;     // cobrança mensal fixa (ex: internet), sem parcelamento
   planned: boolean;
   createdAt: number;
 }

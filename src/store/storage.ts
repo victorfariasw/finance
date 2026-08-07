@@ -12,9 +12,9 @@ export async function loadState(): Promise<AppState> {
     return {
       items: Array.isArray(parsed.items) ? parsed.items : [],
       actuals: parsed.actuals && typeof parsed.actuals === 'object' ? parsed.actuals : {},
-      // Compras salvas antes do campo `planned` são tratadas como confirmadas.
+      // Compras antigas: `planned` default confirmado, `recurring` default parcelada.
       cards: Array.isArray(parsed.cards)
-        ? parsed.cards.map((c: any) => ({ ...c, planned: c.planned ?? false }))
+        ? parsed.cards.map((c: any) => ({ ...c, planned: c.planned ?? false, recurring: c.recurring ?? false }))
         : [],
       yields: Array.isArray(parsed.yields) ? parsed.yields : [],
       withdrawals: Array.isArray(parsed.withdrawals) ? parsed.withdrawals : [],
