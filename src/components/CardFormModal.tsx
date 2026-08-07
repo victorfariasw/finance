@@ -117,13 +117,15 @@ export function CardFormModal({
         <NumberField label="Parcelas" value={installments} onChange={setInstallments} suffix="x" />
       ) : null}
 
-      <View style={styles.field}>
-        <Label>Situação</Label>
-        <View style={styles.chips}>
-          <Chip label="Já comprei" active={!planned} onPress={() => setPlanned(false)} color={colors.card} />
-          <Chip label="Previsto (simulação)" active={planned} onPress={() => setPlanned(true)} color={colors.card} />
+      {!recurring ? (
+        <View style={styles.field}>
+          <Label>Situação</Label>
+          <View style={styles.chips}>
+            <Chip label="Já comprei" active={!planned} onPress={() => setPlanned(false)} color={colors.card} />
+            <Chip label="Previsto (simulação)" active={planned} onPress={() => setPlanned(true)} color={colors.card} />
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.field}>
         <Label>{recurring ? 'A partir de' : '1ª parcela em'}</Label>
@@ -142,8 +144,10 @@ export function CardFormModal({
         <View style={styles.preview}>
           {recurring ? (
             <>
-              <Text style={styles.previewMain}>{formatBRL(total)} / mês</Text>
-              <Text style={styles.previewSub}>Todo mês a partir de {labelMedium(firstMonth)}</Text>
+              <Text style={styles.previewMain}>{formatBRL(total)} / mês (previsto)</Text>
+              <Text style={styles.previewSub}>
+                A partir de {labelMedium(firstMonth)} · ajuste o valor real em cada mês
+              </Text>
             </>
           ) : (
             <>

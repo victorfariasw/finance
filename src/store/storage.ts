@@ -16,6 +16,7 @@ export async function loadState(): Promise<AppState> {
       cards: Array.isArray(parsed.cards)
         ? parsed.cards.map((c: any) => ({ ...c, planned: c.planned ?? false, recurring: c.recurring ?? false }))
         : [],
+      cardActuals: parsed.cardActuals && typeof parsed.cardActuals === 'object' ? parsed.cardActuals : {},
       yields: Array.isArray(parsed.yields) ? parsed.yields : [],
       withdrawals: Array.isArray(parsed.withdrawals) ? parsed.withdrawals : [],
     };

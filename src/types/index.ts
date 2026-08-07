@@ -73,11 +73,19 @@ export interface WithdrawalEntry {
   createdAt: number;
 }
 
+/** Valor realizado de uma cobrança RECORRENTE do cartão, por mês (independente). */
+export interface CardActual {
+  amount: number; // centavos
+}
+
 export interface AppState {
   items: RecurringItem[]; // entradas, saídas comuns e aportes (kind='investment')
   // actuals[itemId][monthKey] = valor realizado
   actuals: Record<string, Record<MonthKey, Actual>>;
   cards: CardPurchase[];
+  // cardActuals[cardId][monthKey] = valor lançado de uma cobrança recorrente naquele mês.
+  // Presença = mês confirmado; ausência = ainda previsto. (Só usado por cartões recorrentes.)
+  cardActuals: Record<string, Record<MonthKey, CardActual>>;
   yields: YieldEntry[];
   withdrawals: WithdrawalEntry[];
 }
@@ -86,6 +94,7 @@ export const emptyState: AppState = {
   items: [],
   actuals: {},
   cards: [],
+  cardActuals: {},
   yields: [],
   withdrawals: [],
 };

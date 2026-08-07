@@ -45,12 +45,25 @@ export function cardActiveInMonth(card: CardPurchase, month: MonthKey): boolean 
   return idx >= 0 && idx < card.installments;
 }
 
-/** Valor desta compra que cai no mês (0 se não incidir). */
-export function cardInstallmentForMonth(card: CardPurchase, month: MonthKey): number {
+/**
+ * Valor desta cobrança que cai no mês (0 se não incidir).
+ * - Recorrente: valor LANÇADO daquele mês (se houver), senão o previsto (mensal).
+ * - Parcelada: valor da parcela (fixo).
+ */
+export function cardMonthAmount(state: AppState, card: CardPurchase, month: MonthKey): number {
   if (!cardActiveInMonth(card, month)) return 0;
-  if (card.recurring) return card.total; // valor mensal fixo
+  if (card.recurring) {
+    return state.cardActuals[card.id]?.[month]?.amount ?? card.total;
+  }
   const idx = monthsBetween(card.firstMonth, month);
   return installmentAmount(card.total, card.installments, idx);
+}
+
+/** A cobrança está confirmada (lançada) neste mês? */
+export function cardMonthConfirmed(state: AppState, card: CardPurchase, month: MonthKey): boolean {
+  if (!cardActiveInMonth(card, month)) return false;
+  if (card.recurring) return !!state.cardActuals[card.id]?.[month];
+  return !card.planned;
 }
 
 /** Índice (1-based) da parcela deste mês, ou null (recorrentes não têm parcela). */
@@ -67,14 +80,17 @@ export function cardsForMonth(state: AppState, month: MonthKey): CardPurchase[] 
     .sort((a, b) => a.description.localeCompare(b.description, 'pt-BR'));
 }
 
-/** Fatura PREVISTA do mês: parcelas de todas as compras (previstas + confirmadas). */
+/** Fatura PREVISTA do mês: valor esperado de todas as cobranças (confirmadas usam o lançado). */
 export function cardPlannedForMonth(state: AppState, month: MonthKey): number {
-  return state.cards.reduce((sum, c) => sum + cardInstallmentForMonth(c, month), 0);
+  return state.cards.reduce((sum, c) => sum + cardMonthAmount(state, c, month), 0);
 }
 
-/** Fatura REALIZADA do mês: parcelas apenas das compras confirmadas. */
+/** Fatura REALIZADA do mês: só as cobranças confirmadas naquele mês. */
 export function cardRealizedForMonth(state: AppState, month: MonthKey): number {
-  return state.cards.reduce((sum, c) => sum + (c.planned ? 0 : cardInstallmentForMonth(c, month)), 0);
+  return state.cards.reduce(
+    (sum, c) => sum + (cardMonthConfirmed(state, c, month) ? cardMonthAmount(state, c, month) : 0),
+    0,
+  );
 }
 
 export interface MonthSummary {

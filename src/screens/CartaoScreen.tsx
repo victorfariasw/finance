@@ -8,7 +8,8 @@ import {
   cardsForMonth,
   cardPlannedForMonth,
   cardRealizedForMonth,
-  cardInstallmentForMonth,
+  cardMonthAmount,
+  cardMonthConfirmed,
   cardInstallmentIndex,
 } from '../store/selectors';
 import { formatBRL } from '../utils/money';
@@ -17,7 +18,14 @@ import { ScreenHeader } from '../components/Screen';
 import { MonthSelector } from '../components/MonthSelector';
 import { Card, Fab, EmptyState, SectionTitle, Divider } from '../components/ui';
 import { CardFormModal } from '../components/CardFormModal';
+import { CardActualModal } from '../components/CardActualModal';
 import { SwipeToConfirm } from '../components/SwipeToConfirm';
+
+interface Row {
+  card: CardPurchase;
+  amount: number;
+  confirmed: boolean;
+}
 
 export function CartaoScreen({
   month,
@@ -26,19 +34,49 @@ export function CartaoScreen({
   month: MonthKey;
   onChangeMonth: (m: MonthKey) => void;
 }) {
-  const { state, updateCard } = useFinance();
+  const { state, updateCard, setCardActual } = useFinance();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const monthCards = cardsForMonth(state, month);
-  const confirmadas = monthCards.filter((c) => !c.planned);
-  const previstas = monthCards.filter((c) => c.planned);
+
+  const rows: Row[] = cardsForMonth(state, month).map((card) => ({
+    card,
+    amount: cardMonthAmount(state, card, month),
+    confirmed: cardMonthConfirmed(state, card, month),
+  }));
+  const confirmadas = rows.filter((r) => r.confirmed);
+  const previstas = rows.filter((r) => !r.confirmed);
   const planned = cardPlannedForMonth(state, month);
   const realized = cardRealizedForMonth(state, month);
 
   const [showAdd, setShowAdd] = React.useState(false);
   const [editing, setEditing] = React.useState<CardPurchase | null>(null);
+  const [valueCard, setValueCard] = React.useState<CardPurchase | null>(null);
 
-  const confirm = (c: CardPurchase) => updateCard({ ...c, planned: false });
+  // Confirmar: recorrente lança o valor previsto naquele mês; parcelada confirma a compra.
+  const confirm = (c: CardPurchase) => {
+    if (c.recurring) setCardActual(c.id, month, { amount: c.total });
+    else updateCard({ ...c, planned: false });
+  };
+  // Toque: recorrente abre o valor do mês; parcelada abre a edição da compra.
+  const press = (c: CardPurchase) => {
+    if (c.recurring) setValueCard(c);
+    else setEditing(c);
+  };
+
+  const renderRow = (r: Row, idx: number) => (
+    <View key={r.card.id}>
+      {idx > 0 ? <Divider /> : null}
+      <CardMonthRow
+        card={r.card}
+        month={month}
+        amount={r.amount}
+        confirmed={r.confirmed}
+        onPress={() => press(r.card)}
+        onLongPress={r.card.recurring ? () => setEditing(r.card) : undefined}
+        onConfirm={() => confirm(r.card)}
+      />
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -55,9 +93,9 @@ export function CartaoScreen({
           <Text style={styles.totalValue}>{formatBRL(realized)}</Text>
           <Text style={styles.totalSub}>
             {planned !== realized ? `Prevista ${formatBRL(planned)} · ` : ''}
-            {monthCards.length === 0
+            {rows.length === 0
               ? 'sem lançamentos'
-              : `${monthCards.length} ${monthCards.length === 1 ? 'lançamento' : 'lançamentos'}`}
+              : `${rows.length} ${rows.length === 1 ? 'lançamento' : 'lançamentos'}`}
           </Text>
         </Card>
 
@@ -68,12 +106,7 @@ export function CartaoScreen({
             {confirmadas.length === 0 ? (
               <EmptyState icon="💳" title="Nenhum lançamento confirmado" />
             ) : (
-              confirmadas.map((c, idx) => (
-                <View key={c.id}>
-                  {idx > 0 ? <Divider /> : null}
-                  <CardMonthRow card={c} month={month} onEdit={() => setEditing(c)} onConfirm={() => confirm(c)} />
-                </View>
-              ))
+              confirmadas.map(renderRow)
             )}
           </Card>
         </View>
@@ -82,19 +115,12 @@ export function CartaoScreen({
         {previstas.length > 0 ? (
           <View style={styles.block}>
             <SectionTitle>Previstos de {labelMedium(month)}</SectionTitle>
-            <Card style={{ paddingVertical: spacing.xs }}>
-              {previstas.map((c, idx) => (
-                <View key={c.id}>
-                  {idx > 0 ? <Divider /> : null}
-                  <CardMonthRow card={c} month={month} onEdit={() => setEditing(c)} onConfirm={() => confirm(c)} />
-                </View>
-              ))}
-            </Card>
+            <Card style={{ paddingVertical: spacing.xs }}>{previstas.map(renderRow)}</Card>
           </View>
         ) : null}
 
         <Text style={styles.hint}>
-          Previstos são simulações — arraste pra esquerda para confirmar quando comprar.
+          Toque numa recorrente para lançar o valor real do mês · Arraste pra esquerda pra confirmar
         </Text>
       </ScrollView>
 
@@ -107,6 +133,12 @@ export function CartaoScreen({
         month={month}
         editing={editing}
       />
+      <CardActualModal
+        visible={valueCard !== null}
+        onClose={() => setValueCard(null)}
+        card={valueCard}
+        month={month}
+      />
     </View>
   );
 }
@@ -114,26 +146,34 @@ export function CartaoScreen({
 function CardMonthRow({
   card,
   month,
-  onEdit,
+  amount,
+  confirmed,
+  onPress,
+  onLongPress,
   onConfirm,
 }: {
   card: CardPurchase;
   month: MonthKey;
-  onEdit: () => void;
+  amount: number;
+  confirmed: boolean;
+  onPress: () => void;
+  onLongPress?: () => void;
   onConfirm: () => void;
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const parc = cardInstallmentIndex(card, month);
-  const val = cardInstallmentForMonth(card, month);
   const meta = card.recurring
-    ? `Mensal · desde ${labelMedium(card.firstMonth)}`
-    : `Parcela ${parc}/${card.installments} · Total ${formatBRL(card.total)}`;
+    ? confirmed
+      ? `Mensal · previsto ${formatBRL(card.total)}`
+      : 'Mensal'
+    : `Parcela ${cardInstallmentIndex(card, month)}/${card.installments} · Total ${formatBRL(card.total)}`;
 
   return (
-    <SwipeToConfirm enabled={card.planned} label="Confirmar" color={colors.card} onConfirm={onConfirm}>
+    <SwipeToConfirm enabled={!confirmed} label="Confirmar" color={colors.card} onConfirm={onConfirm}>
       <Pressable
-        onPress={onEdit}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={280}
         style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceAlt }]}
       >
         <View style={{ flex: 1, paddingRight: spacing.md }}>
@@ -142,7 +182,7 @@ function CardMonthRow({
           </Text>
           <Text style={styles.rowMeta}>{meta}</Text>
         </View>
-        <Text style={[styles.rowValue, { color: colors.card }]}>{formatBRL(val)}</Text>
+        <Text style={[styles.rowValue, { color: colors.card }]}>{formatBRL(amount)}</Text>
       </Pressable>
     </SwipeToConfirm>
   );
