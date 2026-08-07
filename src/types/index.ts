@@ -58,12 +58,25 @@ export interface YieldEntry {
   createdAt: number;
 }
 
+/**
+ * Retirada do investimento: dinheiro que sai do patrimônio investido e volta
+ * para o saldo disponível da conta no mês. Reduz o montante, aumenta o saldo.
+ */
+export interface WithdrawalEntry {
+  id: string;
+  month: MonthKey;
+  amount: number;      // centavos
+  description: string; // opcional
+  createdAt: number;
+}
+
 export interface AppState {
   items: RecurringItem[]; // entradas, saídas comuns e aportes (kind='investment')
   // actuals[itemId][monthKey] = valor realizado
   actuals: Record<string, Record<MonthKey, Actual>>;
   cards: CardPurchase[];
   yields: YieldEntry[];
+  withdrawals: WithdrawalEntry[];
 }
 
 export const emptyState: AppState = {
@@ -71,4 +84,5 @@ export const emptyState: AppState = {
   actuals: {},
   cards: [],
   yields: [],
+  withdrawals: [],
 };

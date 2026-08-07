@@ -2,9 +2,16 @@ import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Palette, spacing, radius, font } from '../theme/theme';
 import { useTheme, useThemedStyles } from '../store/ThemeContext';
-import { MonthKey, RecurringItem, YieldEntry } from '../types';
+import { MonthKey, RecurringItem, YieldEntry, WithdrawalEntry } from '../types';
 import { useFinance } from '../store/FinanceContext';
-import { itemsForMonth, getActual, montanteUpTo, yieldsForMonth, monthSummary } from '../store/selectors';
+import {
+  itemsForMonth,
+  getActual,
+  montanteUpTo,
+  yieldsForMonth,
+  withdrawalsForMonth,
+  monthSummary,
+} from '../store/selectors';
 import { formatBRL } from '../utils/money';
 import { labelMedium } from '../utils/dates';
 import { ScreenHeader } from '../components/Screen';
@@ -14,8 +21,9 @@ import { ItemRow } from '../components/ItemRow';
 import { ItemFormModal } from '../components/ItemFormModal';
 import { ActualModal } from '../components/ActualModal';
 import { YieldModal } from '../components/YieldModal';
+import { WithdrawalModal } from '../components/WithdrawalModal';
 
-type AddTarget = 'aporte' | 'rendimento' | null;
+type AddTarget = 'aporte' | 'rendimento' | 'retirada' | null;
 
 export function InvestimentosScreen({
   month,
@@ -29,6 +37,7 @@ export function InvestimentosScreen({
   const styles = useThemedStyles(makeStyles);
   const aportes = itemsForMonth(state, 'investment', month);
   const yields = yieldsForMonth(state, month);
+  const withdrawals = withdrawalsForMonth(state, month);
   const montante = montanteUpTo(state, month);
   const s = monthSummary(state, month);
 
@@ -36,6 +45,7 @@ export function InvestimentosScreen({
   const [editItem, setEditItem] = React.useState<RecurringItem | null>(null);
   const [valueItem, setValueItem] = React.useState<RecurringItem | null>(null);
   const [editYield, setEditYield] = React.useState<YieldEntry | null>(null);
+  const [editWithdraw, setEditWithdraw] = React.useState<WithdrawalEntry | null>(null);
 
   return (
     <View style={styles.container}>
@@ -61,6 +71,15 @@ export function InvestimentosScreen({
               <Text style={styles.breakLabel}>Rendimentos</Text>
               <Text style={styles.breakValue}>{formatBRL(montante.rendimentos)}</Text>
             </View>
+            {montante.retiradas > 0 ? (
+              <>
+                <View style={styles.breakDivider} />
+                <View style={styles.breakItem}>
+                  <Text style={styles.breakLabel}>Retirado</Text>
+                  <Text style={styles.breakValue}>-{formatBRL(montante.retiradas)}</Text>
+                </View>
+              </>
+            ) : null}
           </View>
         </Card>
 
@@ -136,6 +155,33 @@ export function InvestimentosScreen({
           </Card>
         </View>
 
+        {/* Retiradas do mês */}
+        <View style={styles.block}>
+          <SectionTitle right={<AddLink label="+ retirada" onPress={() => setAddTarget('retirada')} />}>
+            Retiradas de {labelMedium(month)}
+          </SectionTitle>
+          <Card>
+            {withdrawals.length === 0 ? (
+              <EmptyState icon="↩️" title="Nenhuma retirada" />
+            ) : (
+              withdrawals.map((w, idx) => (
+                <View key={w.id}>
+                  {idx > 0 ? <Divider /> : null}
+                  <Pressable
+                    onPress={() => setEditWithdraw(w)}
+                    style={({ pressed }) => [styles.yieldRow, pressed && { backgroundColor: colors.surfaceAlt }]}
+                  >
+                    <Text style={styles.yieldDesc} numberOfLines={1}>
+                      {w.description || 'Retirada'}
+                    </Text>
+                    <Text style={[styles.yieldValue, { color: colors.expense }]}>-{formatBRL(w.amount)}</Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
+          </Card>
+        </View>
+
         <Text style={styles.hint}>Toque num aporte para lançar o valor investido · Segure para editar</Text>
       </ScrollView>
 
@@ -166,6 +212,13 @@ export function InvestimentosScreen({
         onClose={() => setEditYield(null)}
         month={month}
         editing={editYield}
+      />
+      <WithdrawalModal visible={addTarget === 'retirada'} onClose={() => setAddTarget(null)} month={month} />
+      <WithdrawalModal
+        visible={editWithdraw !== null}
+        onClose={() => setEditWithdraw(null)}
+        month={month}
+        editing={editWithdraw}
       />
     </View>
   );

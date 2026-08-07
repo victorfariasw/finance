@@ -11,8 +11,8 @@ import {
   cardInstallmentForMonth,
   cardInstallmentIndex,
 } from '../store/selectors';
-import { formatBRL, installmentAmount } from '../utils/money';
-import { addMonths, labelMedium } from '../utils/dates';
+import { formatBRL } from '../utils/money';
+import { labelMedium } from '../utils/dates';
 import { ScreenHeader } from '../components/Screen';
 import { MonthSelector } from '../components/MonthSelector';
 import { Card, Fab, EmptyState, SectionTitle, Divider } from '../components/ui';
@@ -32,7 +32,6 @@ export function CartaoScreen({
   const monthCards = cardsForMonth(state, month);
   const planned = cardPlannedForMonth(state, month);
   const realized = cardRealizedForMonth(state, month);
-  const allCards = [...state.cards].sort((a, b) => b.createdAt - a.createdAt);
 
   const [showAdd, setShowAdd] = React.useState(false);
   const [editing, setEditing] = React.useState<CardPurchase | null>(null);
@@ -104,28 +103,6 @@ export function CartaoScreen({
           </Card>
         </View>
 
-        {/* Todas as compras */}
-        {allCards.length > 0 ? (
-          <View style={styles.block}>
-            <SectionTitle>Todas as compras</SectionTitle>
-            <Card style={{ paddingVertical: spacing.xs }}>
-              {allCards.map((c, idx) => (
-                <View key={c.id}>
-                  {idx > 0 ? <Divider /> : null}
-                  <SwipeToConfirm
-                    enabled={c.planned}
-                    label="Confirmar"
-                    color={colors.card}
-                    onConfirm={() => confirm(c)}
-                  >
-                    <AllPurchaseRow card={c} onPress={() => setEditing(c)} />
-                  </SwipeToConfirm>
-                </View>
-              ))}
-            </Card>
-          </View>
-        ) : null}
-
         <Text style={styles.hint}>
           Compras "previstas" são simulações — arraste pra esquerda para confirmar quando comprar.
         </Text>
@@ -150,36 +127,6 @@ function PlannedTag() {
     <View style={styles.tag}>
       <Text style={styles.tagText}>Previsto</Text>
     </View>
-  );
-}
-
-function AllPurchaseRow({ card, onPress }: { card: CardPurchase; onPress: () => void }) {
-  const { colors } = useTheme();
-  const styles = useThemedStyles(makeStyles);
-  const per = installmentAmount(card.total, card.installments, 0);
-  const last = addMonths(card.firstMonth, card.installments - 1);
-  const period =
-    card.installments === 1
-      ? labelMedium(card.firstMonth)
-      : `${labelMedium(card.firstMonth)} → ${labelMedium(last)}`;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceAlt }]}
-    >
-      <View style={{ flex: 1, paddingRight: spacing.md }}>
-        <View style={styles.rowTitleLine}>
-          <Text style={styles.rowTitle} numberOfLines={1}>
-            {card.description}
-          </Text>
-          {card.planned ? <PlannedTag /> : null}
-        </View>
-        <Text style={styles.rowMeta}>
-          {card.installments}x de {formatBRL(per)} · {period}
-        </Text>
-      </View>
-      <Text style={styles.rowValueSoft}>{formatBRL(card.total)}</Text>
-    </Pressable>
   );
 }
 

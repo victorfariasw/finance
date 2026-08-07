@@ -17,6 +17,7 @@ export async function loadState(): Promise<AppState> {
         ? parsed.cards.map((c: any) => ({ ...c, planned: c.planned ?? false }))
         : [],
       yields: Array.isArray(parsed.yields) ? parsed.yields : [],
+      withdrawals: Array.isArray(parsed.withdrawals) ? parsed.withdrawals : [],
     };
   } catch (e) {
     console.warn('Falha ao carregar estado local:', e);

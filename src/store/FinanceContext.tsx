@@ -6,7 +6,16 @@ import React, {
   useRef,
   useMemo,
 } from 'react';
-import { AppState, Actual, CardPurchase, MonthKey, RecurringItem, YieldEntry, emptyState } from '../types';
+import {
+  AppState,
+  Actual,
+  CardPurchase,
+  MonthKey,
+  RecurringItem,
+  YieldEntry,
+  WithdrawalEntry,
+  emptyState,
+} from '../types';
 import { loadState, saveState } from './storage';
 import { makeId } from '../utils/id';
 
@@ -22,6 +31,9 @@ type Action =
   | { type: 'ADD_YIELD'; entry: YieldEntry }
   | { type: 'UPDATE_YIELD'; entry: YieldEntry }
   | { type: 'DELETE_YIELD'; id: string }
+  | { type: 'ADD_WITHDRAWAL'; entry: WithdrawalEntry }
+  | { type: 'UPDATE_WITHDRAWAL'; entry: WithdrawalEntry }
+  | { type: 'DELETE_WITHDRAWAL'; id: string }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -85,6 +97,18 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_YIELD':
       return { ...state, yields: state.yields.filter((y) => y.id !== action.id) };
 
+    case 'ADD_WITHDRAWAL':
+      return { ...state, withdrawals: [...state.withdrawals, action.entry] };
+
+    case 'UPDATE_WITHDRAWAL':
+      return {
+        ...state,
+        withdrawals: state.withdrawals.map((w) => (w.id === action.entry.id ? action.entry : w)),
+      };
+
+    case 'DELETE_WITHDRAWAL':
+      return { ...state, withdrawals: state.withdrawals.filter((w) => w.id !== action.id) };
+
     case 'RESET':
       return emptyState;
 
@@ -110,6 +134,10 @@ interface FinanceContextValue {
   addYield: (data: Omit<YieldEntry, 'id' | 'createdAt'>) => void;
   updateYield: (entry: YieldEntry) => void;
   deleteYield: (id: string) => void;
+  // retiradas
+  addWithdrawal: (data: Omit<WithdrawalEntry, 'id' | 'createdAt'>) => void;
+  updateWithdrawal: (entry: WithdrawalEntry) => void;
+  deleteWithdrawal: (id: string) => void;
   reset: () => void;
 }
 
@@ -161,6 +189,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'ADD_YIELD', entry: { ...data, id: makeId(), createdAt: Date.now() } }),
       updateYield: (entry) => dispatch({ type: 'UPDATE_YIELD', entry }),
       deleteYield: (id) => dispatch({ type: 'DELETE_YIELD', id }),
+      addWithdrawal: (data) =>
+        dispatch({ type: 'ADD_WITHDRAWAL', entry: { ...data, id: makeId(), createdAt: Date.now() } }),
+      updateWithdrawal: (entry) => dispatch({ type: 'UPDATE_WITHDRAWAL', entry }),
+      deleteWithdrawal: (id) => dispatch({ type: 'DELETE_WITHDRAWAL', id }),
       reset: () => dispatch({ type: 'RESET' }),
     }),
     [state, ready],

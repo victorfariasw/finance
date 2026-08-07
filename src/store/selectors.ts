@@ -1,5 +1,14 @@
 // Seletores puros: recebem o estado + mês e derivam o que as telas mostram.
-import { AppState, Actual, CardPurchase, ItemKind, MonthKey, RecurringItem, YieldEntry } from '../types';
+import {
+  AppState,
+  Actual,
+  CardPurchase,
+  ItemKind,
+  MonthKey,
+  RecurringItem,
+  YieldEntry,
+  WithdrawalEntry,
+} from '../types';
 import { monthsBetween, addMonths } from '../utils/dates';
 import { installmentAmount } from '../utils/money';
 
@@ -68,8 +77,9 @@ export interface MonthSummary {
   cardRealized: number;     // fatura realizada (só confirmadas)
   plannedAporte: number;    // investimento previsto no mês
   realizedAporte: number;   // investimento realizado no mês
-  saldoPrevisto: number;    // já descontando o aporte
-  saldoRealizado: number;   // já descontando o aporte
+  withdrawal: number;       // retirada de investimento no mês (entra como saldo)
+  saldoPrevisto: number;    // já descontando o aporte e somando a retirada
+  saldoRealizado: number;   // já descontando o aporte e somando a retirada
 }
 
 export function monthSummary(state: AppState, month: MonthKey): MonthSummary {
@@ -103,6 +113,9 @@ export function monthSummary(state: AppState, month: MonthKey): MonthSummary {
   const plannedExpense = plannedExpenseItems + cardPlanned;
   const realizedExpense = realizedExpenseItems + cardRealized;
 
+  // Retirada de investimento volta para o caixa do mês (entra como saldo).
+  const withdrawal = monthWithdrawalTotal(state, month);
+
   return {
     plannedIncome,
     realizedIncome,
@@ -112,9 +125,10 @@ export function monthSummary(state: AppState, month: MonthKey): MonthSummary {
     cardRealized,
     plannedAporte,
     realizedAporte,
-    // Aporte também sai do caixa do mês, então reduz o saldo disponível.
-    saldoPrevisto: plannedIncome - plannedExpense - plannedAporte,
-    saldoRealizado: realizedIncome - realizedExpense - realizedAporte,
+    withdrawal,
+    // Aporte sai do caixa (reduz); retirada de investimento entra (soma).
+    saldoPrevisto: plannedIncome - plannedExpense - plannedAporte + withdrawal,
+    saldoRealizado: realizedIncome - realizedExpense - realizedAporte + withdrawal,
   };
 }
 
@@ -132,32 +146,42 @@ export function monthYieldTotal(state: AppState, month: MonthKey): number {
   return yieldsForMonth(state, month).reduce((sum, y) => sum + y.amount, 0);
 }
 
+export function withdrawalsForMonth(state: AppState, month: MonthKey): WithdrawalEntry[] {
+  return state.withdrawals
+    .filter((w) => w.month === month)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export function monthWithdrawalTotal(state: AppState, month: MonthKey): number {
+  return withdrawalsForMonth(state, month).reduce((sum, w) => sum + w.amount, 0);
+}
+
 export interface Montante {
-  aportado: number;    // soma dos aportes acumulados até o mês
+  aportado: number;    // soma dos aportes REALIZADOS acumulados até o mês
   rendimentos: number; // soma dos rendimentos acumulados até o mês
-  total: number;       // patrimônio investido
+  retiradas: number;   // soma das retiradas acumuladas até o mês
+  total: number;       // patrimônio investido = aportado + rendimentos - retiradas
 }
 
 /**
  * Patrimônio investido acumulado até (e incluindo) `month`.
- * Para cada aporte, usa o valor realizado quando lançado, senão o previsto —
- * assim projeta o montante mesmo em meses futuros.
+ * Conta apenas o que foi REALMENTE investido (aporte realizado) — o aporte
+ * previsto não entra no total. Rendimentos somam; retiradas subtraem.
  */
 export function montanteUpTo(state: AppState, month: MonthKey): Montante {
   let aportado = 0;
   for (const item of state.items) {
     if (item.kind !== 'investment') continue;
-    // meses ativos do item dentro de [startMonth, month]
     if (monthsBetween(item.startMonth, month) < 0) continue;
     if (item.fixed) {
       const last = item.endMonth && monthsBetween(item.endMonth, month) < 0 ? item.endMonth : month;
       const count = monthsBetween(item.startMonth, last);
       for (let k = 0; k <= count; k++) {
         const m = addMonths(item.startMonth, k);
-        aportado += getActual(state, item.id, m)?.amount ?? item.planned;
+        aportado += getActual(state, item.id, m)?.amount ?? 0;
       }
-    } else if (monthsBetween(item.startMonth, month) >= 0) {
-      aportado += getActual(state, item.id, item.startMonth)?.amount ?? item.planned;
+    } else {
+      aportado += getActual(state, item.id, item.startMonth)?.amount ?? 0;
     }
   }
 
@@ -166,5 +190,10 @@ export function montanteUpTo(state: AppState, month: MonthKey): Montante {
     if (monthsBetween(y.month, month) >= 0) rendimentos += y.amount;
   }
 
-  return { aportado, rendimentos, total: aportado + rendimentos };
+  let retiradas = 0;
+  for (const w of state.withdrawals) {
+    if (monthsBetween(w.month, month) >= 0) retiradas += w.amount;
+  }
+
+  return { aportado, rendimentos, retiradas, total: aportado + rendimentos - retiradas };
 }
