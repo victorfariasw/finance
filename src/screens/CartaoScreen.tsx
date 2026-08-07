@@ -30,6 +30,8 @@ export function CartaoScreen({
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const monthCards = cardsForMonth(state, month);
+  const confirmadas = monthCards.filter((c) => !c.planned);
+  const previstas = monthCards.filter((c) => c.planned);
   const planned = cardPlannedForMonth(state, month);
   const realized = cardRealizedForMonth(state, month);
 
@@ -54,57 +56,45 @@ export function CartaoScreen({
           <Text style={styles.totalSub}>
             {planned !== realized ? `Prevista ${formatBRL(planned)} · ` : ''}
             {monthCards.length === 0
-              ? 'sem parcelas'
-              : `${monthCards.length} ${monthCards.length === 1 ? 'compra' : 'compras'}`}
+              ? 'sem lançamentos'
+              : `${monthCards.length} ${monthCards.length === 1 ? 'lançamento' : 'lançamentos'}`}
           </Text>
         </Card>
 
-        {/* Parcelas do mês */}
+        {/* Confirmados (lançamentos reais) */}
         <View style={styles.block}>
           <SectionTitle>Lançamentos de {labelMedium(month)}</SectionTitle>
           <Card style={{ paddingVertical: spacing.xs }}>
-            {monthCards.length === 0 ? (
-              <EmptyState icon="💳" title="Nada no cartão neste mês" />
+            {confirmadas.length === 0 ? (
+              <EmptyState icon="💳" title="Nenhum lançamento confirmado" />
             ) : (
-              monthCards.map((c, idx) => {
-                const parc = cardInstallmentIndex(c, month);
-                const val = cardInstallmentForMonth(c, month);
-                return (
-                  <View key={c.id}>
-                    {idx > 0 ? <Divider /> : null}
-                    <SwipeToConfirm
-                      enabled={c.planned}
-                      label="Confirmar"
-                      color={colors.card}
-                      onConfirm={() => confirm(c)}
-                    >
-                      <Pressable
-                        onPress={() => setEditing(c)}
-                        style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceAlt }]}
-                      >
-                        <View style={{ flex: 1, paddingRight: spacing.md }}>
-                          <View style={styles.rowTitleLine}>
-                            <Text style={styles.rowTitle} numberOfLines={1}>
-                              {c.description}
-                            </Text>
-                            {c.planned ? <PlannedTag /> : null}
-                          </View>
-                          <Text style={styles.rowMeta}>
-                            {c.recurring ? `Mensal · desde ${labelMedium(c.firstMonth)}` : `Parcela ${parc}/${c.installments} · Total ${formatBRL(c.total)}`}
-                          </Text>
-                        </View>
-                        <Text style={[styles.rowValue, { color: colors.card }]}>{formatBRL(val)}</Text>
-                      </Pressable>
-                    </SwipeToConfirm>
-                  </View>
-                );
-              })
+              confirmadas.map((c, idx) => (
+                <View key={c.id}>
+                  {idx > 0 ? <Divider /> : null}
+                  <CardMonthRow card={c} month={month} onEdit={() => setEditing(c)} onConfirm={() => confirm(c)} />
+                </View>
+              ))
             )}
           </Card>
         </View>
 
+        {/* Previstos (simulação) — só aparece se houver */}
+        {previstas.length > 0 ? (
+          <View style={styles.block}>
+            <SectionTitle>Previstos de {labelMedium(month)}</SectionTitle>
+            <Card style={{ paddingVertical: spacing.xs }}>
+              {previstas.map((c, idx) => (
+                <View key={c.id}>
+                  {idx > 0 ? <Divider /> : null}
+                  <CardMonthRow card={c} month={month} onEdit={() => setEditing(c)} onConfirm={() => confirm(c)} />
+                </View>
+              ))}
+            </Card>
+          </View>
+        ) : null}
+
         <Text style={styles.hint}>
-          Compras "previstas" são simulações — arraste pra esquerda para confirmar quando comprar.
+          Previstos são simulações — arraste pra esquerda para confirmar quando comprar.
         </Text>
       </ScrollView>
 
@@ -121,12 +111,40 @@ export function CartaoScreen({
   );
 }
 
-function PlannedTag() {
+function CardMonthRow({
+  card,
+  month,
+  onEdit,
+  onConfirm,
+}: {
+  card: CardPurchase;
+  month: MonthKey;
+  onEdit: () => void;
+  onConfirm: () => void;
+}) {
+  const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const parc = cardInstallmentIndex(card, month);
+  const val = cardInstallmentForMonth(card, month);
+  const meta = card.recurring
+    ? `Mensal · desde ${labelMedium(card.firstMonth)}`
+    : `Parcela ${parc}/${card.installments} · Total ${formatBRL(card.total)}`;
+
   return (
-    <View style={styles.tag}>
-      <Text style={styles.tagText}>Previsto</Text>
-    </View>
+    <SwipeToConfirm enabled={card.planned} label="Confirmar" color={colors.card} onConfirm={onConfirm}>
+      <Pressable
+        onPress={onEdit}
+        style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceAlt }]}
+      >
+        <View style={{ flex: 1, paddingRight: spacing.md }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {card.description}
+          </Text>
+          <Text style={styles.rowMeta}>{meta}</Text>
+        </View>
+        <Text style={[styles.rowValue, { color: colors.card }]}>{formatBRL(val)}</Text>
+      </Pressable>
+    </SwipeToConfirm>
   );
 }
 
@@ -170,16 +188,10 @@ const makeStyles = (colors: Palette) =>
       paddingHorizontal: spacing.xs,
       borderRadius: radius.sm,
     },
-    rowTitleLine: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-    },
     rowTitle: {
       fontSize: font.size.md,
       fontWeight: font.weight.semibold,
       color: colors.text,
-      flexShrink: 1,
     },
     rowMeta: {
       fontSize: font.size.xs,
@@ -189,23 +201,6 @@ const makeStyles = (colors: Palette) =>
     rowValue: {
       fontSize: font.size.md,
       fontWeight: font.weight.bold,
-    },
-    rowValueSoft: {
-      fontSize: font.size.md,
-      fontWeight: font.weight.semibold,
-      color: colors.textSoft,
-    },
-    tag: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 1,
-      borderRadius: radius.pill,
-      borderWidth: 1,
-      borderColor: colors.card,
-    },
-    tagText: {
-      fontSize: 10,
-      fontWeight: font.weight.semibold,
-      color: colors.card,
     },
     hint: {
       fontSize: font.size.xs,
